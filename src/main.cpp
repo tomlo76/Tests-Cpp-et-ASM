@@ -11,6 +11,11 @@
 #include "vec4.hpp"
 
 
+#include "vec4_operations.hpp"
+#include "vec4_operations.hxx"
+#include "vec4_operations_asm.hpp"
+#include "vec4_operations_asm_wrapper.hpp"
+
 
 struct Modes {
 	bool compiler = true;
@@ -118,7 +123,7 @@ int main(int argc, char** argv) {
 	}
 	if (modes.serial) {
 		std::cout << "  Serial version\n";
-		std::cout << "   v1 + v2 = " << add_ser(v1, v2) << std::endl;
+		std::cout << "   v1 + v2 = " << add_serial(v1, v2) << std::endl;
 	}
 	if (modes.sse) {
 		std::cout << "  SSE version\n";
@@ -129,6 +134,10 @@ int main(int argc, char** argv) {
 		std::cout << "   v1 + v2 = " << add_avx(v1, v2) << std::endl;
 	}
 
+	
+	
+	
+	
 	if (N != 0) {
 		std::cout << std::endl;
 		std::cout << "===== Efficiency check =====" << std::endl;
@@ -143,7 +152,8 @@ int main(int argc, char** argv) {
 			begin = std::chrono::steady_clock::now();
 			
 			for (unsigned long long int i = 0 ; i < N ; i++) {
-				v = add_com(v1, v2);
+				__asm__ __volatile__("");
+				v = add_compiler(v1, v2);
 			}
 
 			end = std::chrono::steady_clock::now();
@@ -159,7 +169,9 @@ int main(int argc, char** argv) {
 			begin = std::chrono::steady_clock::now();
 			
 			for (unsigned long long int i = 0 ; i < N ; i++) {
-				v = add_ser(v1, v2);
+				__asm__ __volatile__("");
+				v = add_serial(v1, v2);
+				// add_vec4_serial_asm(&v1, &v2, &v);
 			}
 
 			end = std::chrono::steady_clock::now();
@@ -175,7 +187,9 @@ int main(int argc, char** argv) {
 			begin = std::chrono::steady_clock::now();
 			
 			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
 				v = add_sse(v1, v2);
+				// add_vec4_sse_asm(&v1, &v2, &v);
 			}
 
 			end = std::chrono::steady_clock::now();
@@ -190,8 +204,19 @@ int main(int argc, char** argv) {
 		if (modes.avx) {
 			begin = std::chrono::steady_clock::now();
 			
-			for (unsigned long long int i = 0 ; i < N ; i++) {
+			for (unsigned long long int i = 0 ; i < N/4 ; i++) {
+				__asm__ __volatile__("");
 				v = add_avx(v1, v2);
+				// add_vec4_avx_asm(&v1, &v2, &v);
+				/*vec4* Z_ptr = &v;
+				asm volatile (
+					"vmovupd (%[X]), %%ymm1;\n\t"
+					"vaddpd (%[Y]), %%ymm1, %%ymm0;\n\t"
+					"vmovupd %%ymm0, (%[Z]);\n\t"
+					: [Z] "+r" (Z_ptr)
+					: [X] "r" (&v1), [Y] "r" (&v2)
+					: "ymm0", "ymm1"
+				);*/
 			}
 
 			end = std::chrono::steady_clock::now();
