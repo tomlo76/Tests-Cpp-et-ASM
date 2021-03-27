@@ -1,9 +1,26 @@
 CC= gcc
 CXX= g++
+ASA= as
 
 CFLAGS= -g -Wall -Wextra -Iinclude
-CXXFLAGS= -g -Wall -Wextra -std=c++17 -Iinclude -O0 #-fno-tree-vectorize
+CXXFLAGS= -g -Wall -Wextra -std=c++17 -Iinclude -O3 #-fno-tree-vectorize
+ASFLAGS= --warn --gstabs+
 LDFLAGS = $(CXXFLAGS)
+
+
+ifeq ($(OS),Windows_NT)
+    #Windows stuff
+    ASM_OS=win
+else
+    #Linux stuff
+    ASM_OS=linux
+endif
+
+
+VEC4OBJ= obj/vec4.o obj/vec4_operations.o obj/vec4_operations_asm_wrapper.o obj/vec4_operations_$(ASM_OS).o
+VEC4ASM= asm/vec4.a asm/vec4_operations.a asm/vec4_operations_asm_wrapper.a
+
+
 
 
 all: init exe
@@ -21,18 +38,21 @@ asm: init_asm asm/executable
 
 
 # Binaries
-bin/executable: obj/main.o obj/vec4.o
+bin/executable: obj/main.o $(VEC4OBJ)
 	$(CXX) $^ -o bin/executable $(LDFLAGS)
 
-asm/executable: asm/main.a asm/vec4.a
+asm/executable: asm/main.a $(VEC4ASM)
 
 
 
 # Source files
+obj/%.o: src/%.s
+	$(ASA) -o $@ -c $< $(ASFLAGS)
 obj/%.o: src/%.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 obj/%.o: src/%.cpp
 	$(CXX) -o $@ -c $< $(CXXFLAGS)
+
 
 # Assembly files
 asm/%.a: src/%.c
@@ -42,12 +62,15 @@ asm/%.a: src/%.cpp
 
 
 # Cleaning
-.PHONY: clean mrproper alldir
+.PHONY: clean asmclean mrproper clearalldir
 clean: 
-	rm -f obj/*.o asm/*.a bin/executable
+	rm -f obj/*.o bin/*
 
-mrproper: clean
+asmclean:
+	rm -f asm/*.a
+
+mrproper: clean asmclean
 	rm -f obj/*.o obj/*/*.o bin/*
 
-alldir: mrproper
-	rm -r obj/* obj bin
+clearalldir: mrproper
+	rm -r obj bin asm
