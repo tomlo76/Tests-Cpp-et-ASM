@@ -1,10 +1,10 @@
 	.text
 
-	.globl add_vec4_serial_as
-	.globl add_vec4_sse_as
-	.globl add_vec4_avx_as
+	.globl add_vec4_serial_asm
+	.globl add_vec4_sse_asm
+	.globl add_vec4_avx_asm
 
-add_vec4_serial_as:
+add_vec4_serial_asm:
 	movsd (%rcx), %xmm0
 	movsd (%rdx), %xmm1
 	addsd %xmm1, %xmm0
@@ -28,11 +28,11 @@ add_vec4_serial_as:
 	ret
 
 
-# void add_vec4_sse_as(const vec4* X, const vec4* Y, const vec4* Z)
+# void add_vec4_sse_asm(const vec4* X, const vec4* Y, const vec4* Z)
 #   X -> rcx (rax)
 #   Y -> rdx
 #   Z -> r8
-add_vec4_sse_as:
+add_vec4_sse_asm:
 	movupd (%rcx), %xmm0
 	movupd (%rdx), %xmm1
 	addpd %xmm1, %xmm0
@@ -47,7 +47,7 @@ add_vec4_sse_as:
 
 
 # 
-add_vec4_avx_as:
+add_vec4_avx_asm:
 	vmovupd (%rcx), %ymm1
 	vaddpd (%rdx), %ymm1, %ymm0
 	vmovupd %ymm0, (%r8)
