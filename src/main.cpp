@@ -17,6 +17,11 @@
 #include "vec4_operations_asm_wrapper.hpp"
 
 
+
+
+void display_evaluation(std::string title, unsigned long long int N, double elapsedTime);
+
+
 struct Modes {
 	bool compiler = true;
 	bool serial = true;
@@ -160,10 +165,7 @@ int main(int argc, char** argv) {
 
 			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
 
-			std::cout << "  Compiler version\n";
-			std::cout << "    " << N << " operations done in " << elapsed << " s" << "\n";
-			std::cout << "    " << (N/elapsed)/1000000 << " millions operations per second" << "\n";
-			std::cout << "    Mean operation time : " << (elapsed/N)*1000000000 << " ns" << std::endl;
+			display_evaluation("  Compiler version", N, elapsed);
 		}
 		if (modes.serial) {
 			begin = std::chrono::steady_clock::now();
@@ -178,10 +180,7 @@ int main(int argc, char** argv) {
 
 			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
 
-			std::cout << "  Serial version\n";
-			std::cout << "    " << N << " operations done in " << elapsed << " s" << "\n";
-			std::cout << "    " << (N/elapsed)/1000000 << " millions operations per second" << "\n";
-			std::cout << "    Mean operation time : " << (elapsed/N)*1000000000 << " ns" << std::endl;
+			display_evaluation("  Serial version", N, elapsed);
 		}
 		if (modes.sse) {
 			begin = std::chrono::steady_clock::now();
@@ -196,10 +195,7 @@ int main(int argc, char** argv) {
 
 			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
 
-			std::cout << "  SSE version\n";
-			std::cout << "    " << N << " operations done in " << elapsed << " s" << "\n";
-			std::cout << "    " << (N/elapsed)/1000000 << " millions operations per second" << "\n";
-			std::cout << "    Mean operation time : " << (elapsed/N)*1000000000 << " ns" << std::endl;
+			display_evaluation("  SSE version", N, elapsed);
 		}
 		if (modes.avx) {
 			begin = std::chrono::steady_clock::now();
@@ -223,14 +219,22 @@ int main(int argc, char** argv) {
 
 			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
 
-			std::cout << "  AVX version\n";
-			std::cout << "    " << N << " operations done in " << elapsed << " s" << "\n";
-			std::cout << "    " << (N/elapsed)/1000000 << " millions operations per second" << "\n";
-			std::cout << "    Mean operation time : " << (elapsed/N)*1000000000 << " ns" << std::endl;
+			display_evaluation("  AVX version", N, elapsed);
 		}
 		
 		
 	}
 
 	return 0;
+}
+
+
+
+
+
+void display_evaluation(std::string title, unsigned long long int N, double elapsedTime) {
+	std::cout << title << "\n";
+	std::cout << "    " << N << " operations done in " << elapsedTime << " s" << "\n";
+	std::cout << "    " << (N/elapsedTime)/1000000 << " million operations per second" << "\n";
+	std::cout << "    Mean operation time : " << (elapsedTime/N)*1000000000 << " ns" << std::endl;
 }
