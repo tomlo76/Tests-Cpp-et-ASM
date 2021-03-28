@@ -36,10 +36,14 @@ struct Functions {
 	bool wrapper = false;
 };
 
+struct Operations {
+	bool vec4add = false;
+};
 
 
 
-int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigned long long int* N);
+
+int arguments(int argc, char** argv, Modes& modes, Functions& functions, Operations& operations, unsigned long long int* N);
 void evaluate_vec4_add(Modes& modes, Functions& functions, vec4 v1, vec4 v2, unsigned long long int N);
 void display_evaluation(unsigned long long int N, double elapsedTime);
 
@@ -52,9 +56,11 @@ int main(int argc, char** argv) {
 	vec4 v2(3.7, 6.5, 4.8, 9.3);
 	Modes modes;
 	Functions functions;
+	Operations operations;
 	
 	{
-		int status = arguments(argc, argv, modes, functions, &N);
+		int status = arguments(argc, argv, modes, functions, operations, &N);
+		
 		if (status == -1) {
 			return -1;
 		} else if (status == 1) {
@@ -63,15 +69,17 @@ int main(int argc, char** argv) {
 	}
 
 	
-	evaluate_vec4_add(modes, functions, v1, v2, N);
-
+	if (operations.vec4add) {
+		evaluate_vec4_add(modes, functions, v1, v2, N);
+	}
+	
 	return 0;
 }
 
 
 
 
-int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigned long long int* N) {
+int arguments(int argc, char** argv, Modes& modes, Functions& functions, Operations& operations, unsigned long long int* N) {
 	if (argc > 1) {
 		std::stringstream ss;
 		std::string arg;
@@ -201,6 +209,36 @@ int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigne
 					std::cerr << "Error : function is not specified" << std::endl;
 				}
 			} else if (arg == "--operation" || arg == "-o") {
+				if (++i < argc) {
+					ss.clear();
+					ss.str(argv[i]);
+					std::string operation = ss.str();
+					std::replace(operation.begin(), operation.end(), ',', ' ');
+					ss.clear();
+					ss.str(operation);
+					
+					operations.vec4add = false;
+					
+					while (ss >> operation) {
+						if (operation == "list") {
+							std::cout << "Available operations : all, vec4add" << std::endl;
+							
+							return 1;
+						} else if (operation == "vec4add") {
+							operations.vec4add = true;
+						} else if (operation == "all") {
+							operations.vec4add = true;
+						} else {
+							error = true;
+							std::cerr << "Unknown operation \"" << operation << "\"" << std::endl;
+						}
+					}
+					
+				} else {
+					error = true;
+					
+					std::cerr << "Error : operation is not specified" << std::endl;
+				}
 			} else if (arg == "-v1" || arg == "--v1") {
 			} else if (arg == "-v2" || arg == "--v2") {
 			} else {
