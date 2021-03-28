@@ -40,8 +40,8 @@ struct Functions {
 
 
 int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigned long long int* N);
-double evaluate(void* function(void), unsigned long long int N);
-void display_evaluation(std::string title, unsigned long long int N, double elapsedTime);
+void evaluate_vec4_add(Modes& modes, Functions& functions, vec4 v1, vec4 v2, unsigned long long int N);
+void display_evaluation(unsigned long long int N, double elapsedTime);
 
 
 
@@ -62,115 +62,8 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	std::cout << "===== Operation check =====" << std::endl;
 	
-	std::cout << " - Addition\n";
-	std::cout << "        v1 = " << v1 << "\n";
-	std::cout << "        v2 = " << v2 << std::endl;
-	if (modes.compiler) {
-		std::cout << "  Compiler version\n";
-		std::cout << "   v1 + v2 = " << v1 + v2 << std::endl;
-	}
-	if (modes.serial) {
-		std::cout << "  Serial version\n";
-		std::cout << "   v1 + v2 = " << add_serial(v1, v2) << std::endl;
-	}
-	if (modes.sse) {
-		std::cout << "  SSE version\n";
-		std::cout << "   v1 + v2 = " << add_sse(v1, v2) << std::endl;
-	}
-	if (modes.avx) {
-		std::cout << "  AVX version\n";
-		std::cout << "   v1 + v2 = " << add_avx(v1, v2) << std::endl;
-	}
-
-	
-	
-	
-	
-	if (N != 0) {
-		std::cout << std::endl;
-		std::cout << "===== Efficiency check =====" << std::endl;
-		
-		std::chrono::steady_clock::time_point begin;
-		std::chrono::steady_clock::time_point end;
-		double elapsed;
-		vec4 v __attribute__((unused));
-		
-		
-		if (modes.compiler) {
-			begin = std::chrono::steady_clock::now();
-			
-			for (unsigned long long int i = 0 ; i < N ; i++) {
-				__asm__ __volatile__("");
-				//v = add_compiler(v1, v2);
-				add_vec4_avx_pp(v1, v2, v);
-			}
-
-			end = std::chrono::steady_clock::now();
-
-			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
-
-			display_evaluation("  Compiler version", N, elapsed);
-		}
-		if (modes.serial) {
-			begin = std::chrono::steady_clock::now();
-			
-			for (unsigned long long int i = 0 ; i < N ; i++) {
-				__asm__ __volatile__("");
-				//v = add_serial(v1, v2);
-				// add_vec4_serial_asm(&v1, &v2, &v);
-			}
-
-			end = std::chrono::steady_clock::now();
-
-			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
-
-			display_evaluation("  Serial version", N, elapsed);
-		}
-		if (modes.sse) {
-			begin = std::chrono::steady_clock::now();
-			
-			for (unsigned long long int i = 0 ; i < N ; i++) {
-				__asm__ __volatile__("");
-				//v = add_sse(v1, v2);
-				// add_vec4_sse_asm(&v1, &v2, &v);
-				add_vec4_avx_asm(&v1, &v2, &v);
-			}
-
-			end = std::chrono::steady_clock::now();
-
-			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
-
-			display_evaluation("  SSE version", N, elapsed);
-		}
-		if (modes.avx) {
-			begin = std::chrono::steady_clock::now();
-			
-			for (unsigned long long int i = 0 ; i < N ; i++) {
-				__asm__ __volatile__("");
-				//v = add_avx(v1, v2);
-				// add_vec4_avx_asm(&v1, &v2, &v);
-				vec4* Z_ptr = &v;
-				asm volatile (
-					"vmovupd (%[X]), %%ymm1;\n\t"
-					"vaddpd (%[Y]), %%ymm1, %%ymm0;\n\t"
-					"vmovupd %%ymm0, (%[Z]);\n\t"
-					: [Z] "+r" (Z_ptr)
-					: [X] "r" (&v1), [Y] "r" (&v2)
-					: "ymm0", "ymm1"
-				);
-			}
-
-			end = std::chrono::steady_clock::now();
-
-			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
-
-			display_evaluation("  AVX version", N, elapsed);
-		}
-		
-		
-	}
+	evaluate_vec4_add(modes, functions, v1, v2, N);
 
 	return 0;
 }
@@ -232,11 +125,15 @@ int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigne
 					
 					while (ss >> mode) {
 						if (mode == "list") {
-							std::cout << "Available modes : compiler [comp], fpu, serial, sse, avx" << std::endl;
+							std::cout << "Available modes : all, operation [op], compiler [comp], fpu, serial, sse, avx" << std::endl;
 							
 							return 1;
+						} else if (mode == "operation" || mode == "op") {
+							modes.operation = true;
 						} else if (mode == "compiler" || mode == "comp") {
 							modes.compiler = true;
+						} else if (mode == "fpu") {
+							modes.fpu = true;
 						} else if (mode == "serial") {
 							modes.serial = true;
 						} else if (mode == "sse") {
@@ -244,6 +141,7 @@ int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigne
 						} else if (mode == "avx") {
 							modes.avx = true;
 						} else if (mode == "all") {
+							modes.operation = true;
 							modes.compiler = true;
 							modes.serial = true;
 							modes.sse = true;
@@ -257,10 +155,51 @@ int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigne
 				} else {
 					error = true;
 					
-					std::cerr << "Error : mode is not specified" << std::endl;
+					std::cerr << "Error : mode is not specified" << "\""  << std::endl;
 				}
 			} else if (arg == "--function" || arg == "-f") {
-				
+				if (++i < argc) {
+					ss.clear();
+					ss.str(argv[i]);
+					std::string function = ss.str();
+					std::replace(function.begin(), function.end(), ',', ' ');
+					ss.clear();
+					ss.str(function);
+					
+					functions.function = false;
+					functions.preproc = false;
+					functions.asmcode = false;
+					functions.wrapper = false;
+					
+					while (ss >> function) {
+						if (function == "list") {
+							std::cout << "Available functions : all, function [func], preprocessor [pp], asm, wrapper" << std::endl;
+							
+							return 1;
+						} else if (function == "function" || function == "func") {
+							functions.function = true;
+						} else if (function == "preprocessor" || function == "pp") {
+							functions.preproc = true;
+						} else if (function == "asm") {
+							functions.asmcode = true;
+						} else if (function == "wrapper") {
+							functions.wrapper = true;
+						} else if (function == "all") {
+							functions.function = true;
+							functions.preproc = true;
+							functions.asmcode = true;
+							functions.wrapper = true;
+						} else {
+							error = true;
+							std::cerr << "Unknown function \"" << function << "\"" << std::endl;
+						}
+					}
+					
+				} else {
+					error = true;
+					
+					std::cerr << "Error : function is not specified" << std::endl;
+				}
 			} else if (arg == "--operation" || arg == "-o") {
 			} else if (arg == "-v1" || arg == "--v1") {
 			} else if (arg == "-v2" || arg == "--v2") {
@@ -280,9 +219,322 @@ int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigne
 }
 
 
+void evaluate_vec4_add(Modes& modes, Functions& functions, vec4 v1, vec4 v2, unsigned long long int N) {
+	std::chrono::steady_clock::time_point begin;
+	std::chrono::steady_clock::time_point end;
+	double elapsed;
+	vec4 v __attribute__((unused));
+	
+	
+	std::cout << "===== Evaluating vec4 addition =====" << std::endl;
+	std::cout << "       v1 = " << v1 << "\n";
+	std::cout << "       v2 = " << v2 << "\n";
+	std::cout << "  v1 + v2 = " << v1 + v2 << "\n";
+	std::cout << std::endl;
+	
+	if (modes.operation) {
+		std::cout << "Operation version" << "\n";
+		std::cout << "  v1 + v2 = " << v1 + v2 << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				v = v1 + v2;
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.compiler) {
+		std::cout << "Compiler version" << "\n";
+		std::cout << "  v1 + v2 = " << add_compiler(v1, v2) << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				v = add_compiler(v1, v2);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.fpu && functions.preproc) {
+		std::cout << "FPU (preprocessor implementation)" << "\n";
+		add_vec4_fpu_pp(v1, v2, v);
+		std::cout << "  v1 + v2 = " << v << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				add_vec4_fpu_pp(v1, v2, v);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	/*************
+	 * SERIAL
+	 *************/
+	if (modes.serial && functions.function) {
+		std::cout << "Serial (function implementation)" << "\n";
+		std::cout << "  v1 + v2 = " << add_serial(v1, v2) << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				v = add_serial(v1, v2);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.serial && functions.preproc) {
+		std::cout << "Serial (preprocessor implementation)" << "\n";
+		add_vec4_serial_pp(v1, v2, v);
+		std::cout << "  v1 + v2 = " << v << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				add_vec4_serial_pp(v1, v2, v);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.serial && functions.asmcode) {
+		std::cout << "Serial (assembly implementation)" << "\n";
+		add_vec4_serial_asm(&v1, &v2, &v);
+		std::cout << "  v1 + v2 = " << v << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				add_vec4_serial_asm(&v1, &v2, &v);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.serial && functions.wrapper) {
+		std::cout << "Serial (wrapped implementation)" << "\n";
+		std::cout << "  v1 + v2 = " << add_vec4_serial_asm_wrapper(v1, v2) << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				v = add_vec4_serial_asm_wrapper(v1, v2);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	
+	/*************
+	 * SSE
+	 *************/
+	if (modes.sse && functions.function) {
+		std::cout << "SSE (function implementation)" << "\n";
+		std::cout << "  v1 + v2 = " << add_sse(v1, v2) << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				v = add_sse(v1, v2);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.sse && functions.preproc) {
+		std::cout << "SSE (preprocessor implementation)" << "\n";
+		add_vec4_sse_pp(v1, v2, v);
+		std::cout << "  v1 + v2 = " << v << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				add_vec4_sse_pp(v1, v2, v);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.sse && functions.asmcode) {
+		std::cout << "SSE (assembly implementation)" << "\n";
+		add_vec4_sse_asm(&v1, &v2, &v);
+		std::cout << "  v1 + v2 = " << v << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				add_vec4_sse_asm(&v1, &v2, &v);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.sse && functions.wrapper) {
+		std::cout << "SSE (wrapped implementation)" << "\n";
+		std::cout << "  v1 + v2 = " << add_vec4_sse_asm_wrapper(v1, v2) << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				v = add_vec4_sse_asm_wrapper(v1, v2);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	/*************
+	 * AVX
+	 *************/
+	if (modes.avx && functions.function) {
+		std::cout << "AVX (function implementation)" << "\n";
+		std::cout << "  v1 + v2 = " << add_avx(v1, v2) << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				v = add_avx(v1, v2);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.avx && functions.preproc) {
+		std::cout << "AVX (preprocessor implementation)" << "\n";
+		add_vec4_avx_pp(v1, v2, v);
+		std::cout << "  v1 + v2 = " << v << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				add_vec4_avx_pp(v1, v2, v);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.avx && functions.asmcode) {
+		std::cout << "AVX (assembly implementation)" << "\n";
+		add_vec4_avx_asm(&v1, &v2, &v);
+		std::cout << "  v1 + v2 = " << v << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				add_vec4_avx_asm(&v1, &v2, &v);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+	
+	if (modes.avx && functions.wrapper) {
+		std::cout << "AVX (wrapped implementation)" << "\n";
+		std::cout << "  v1 + v2 = " << add_vec4_avx_asm_wrapper(v1, v2) << std::endl;
+		
+		if (N > 0) {
+			begin = std::chrono::steady_clock::now();
+			
+			for (unsigned long long int i = 0 ; i < N ; i++) {
+				__asm__ __volatile__("");
+				v = add_vec4_avx_asm_wrapper(v1, v2);
+			}
+			end = std::chrono::steady_clock::now();
+			
+			elapsed = ((double) std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()) / 1000.0;
+			display_evaluation(N, elapsed);
+			std::cout << std::endl;
+		}
+	}
+}
 
-void display_evaluation(std::string title, unsigned long long int N, double elapsedTime) {
-	std::cout << title << "\n";
+
+void display_evaluation(unsigned long long int N, double elapsedTime) {
 	std::cout << "    " << N << " operations done in " << elapsedTime << " s" << "\n";
 	std::cout << "    " << (N/elapsedTime)/1000000 << " million operations per second" << "\n";
 	std::cout << "    Mean operation time : " << (elapsedTime/N)*1000000000 << " ns" << std::endl;
