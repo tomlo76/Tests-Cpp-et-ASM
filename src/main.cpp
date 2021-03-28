@@ -19,15 +19,31 @@
 
 
 
-void display_evaluation(std::string title, unsigned long long int N, double elapsedTime);
-
 
 struct Modes {
+	bool operation = false;
 	bool compiler = true;
+	bool fpu = false;
 	bool serial = true;
 	bool sse = true;
 	bool avx = true;
 };
+
+struct Functions {
+	bool function = true;
+	bool preproc = true;
+	bool asmcode = false;
+	bool wrapper = false;
+};
+
+
+
+
+int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigned long long int* N);
+double evaluate(void* function(void), unsigned long long int N);
+void display_evaluation(std::string title, unsigned long long int N, double elapsedTime);
+
+
 
 
 int main(int argc, char** argv) {
@@ -35,87 +51,16 @@ int main(int argc, char** argv) {
 	vec4 v1(1.1, 2.1, 3.1, 4.1);
 	vec4 v2(3.7, 6.5, 4.8, 9.3);
 	Modes modes;
+	Functions functions;
 	
-	if (argc > 1) {
-		std::stringstream ss;
-		std::string arg;
-		bool error = false;
-		
-		for (int i = 1 ; i < argc ; i++) {
-			ss.clear();
-			ss.str(argv[i]);
-			arg = ss.str();
-			
-			if (arg == "-n" || arg == "-N") {
-				if (++i < argc) {
-					ss.clear();
-					ss.str(argv[i]);
-					ss >> N;
-					
-					if (ss.fail()) {
-						error = true;
-						
-						std::cerr << "\"" << argv[i] << "\" is not a valid number" << std::endl;
-					}
-				} else {
-					error = true;
-					
-					std::cerr << "Error : number of operations is not specified" << std::endl;
-				}
-			} else if (arg == "--mode" || arg == "-m") {
-				if (++i < argc) {
-					ss.clear();
-					ss.str(argv[i]);
-					std::string mode = ss.str();
-					std::replace(mode.begin(), mode.end(), ',', ' ');
-					ss.clear();
-					ss.str(mode);
-					
-					modes.compiler = false;
-					modes.serial = false;
-					modes.sse = false;
-					modes.avx = false;
-					
-					while (ss >> mode) {
-						if (mode == "compiler" || mode == "comp") {
-							modes.compiler = true;
-						} else if (mode == "serial") {
-							modes.serial = true;
-						} else if (mode == "sse") {
-							modes.sse = true;
-						} else if (mode == "avx") {
-							modes.avx = true;
-						} else if (mode == "all") {
-							modes.compiler = true;
-							modes.serial = true;
-							modes.sse = true;
-							modes.avx = true;
-						} else {
-							error = true;
-							std::cerr << "Unknown mode \"" << mode << std::endl;
-						}
-					}
-					
-				} else {
-					error = true;
-					
-					std::cerr << "Error : mode is not specified" << std::endl;
-				}
-			} else if (arg == "--operation" || arg == "-o") {
-			} else if (arg == "-v1" || arg == "--v1") {
-			} else if (arg == "-v2" || arg == "--v2") {
-			} else {
-				error = true;
-				
-				std::cerr << "Error : parameter \"" << arg << "\" is not valid" << std::endl;
-			}
-		}
-		
-		if (error) {
+	{
+		int status = arguments(argc, argv, modes, functions, &N);
+		if (status == -1) {
 			return -1;
+		} else if (status == 1) {
+			return 0;
 		}
 	}
-
 
 	std::cout << "===== Operation check =====" << std::endl;
 	
@@ -158,7 +103,8 @@ int main(int argc, char** argv) {
 			
 			for (unsigned long long int i = 0 ; i < N ; i++) {
 				__asm__ __volatile__("");
-				v = add_compiler(v1, v2);
+				//v = add_compiler(v1, v2);
+				add_vec4_avx_pp(v1, v2, v);
 			}
 
 			end = std::chrono::steady_clock::now();
@@ -172,7 +118,7 @@ int main(int argc, char** argv) {
 			
 			for (unsigned long long int i = 0 ; i < N ; i++) {
 				__asm__ __volatile__("");
-				v = add_serial(v1, v2);
+				//v = add_serial(v1, v2);
 				// add_vec4_serial_asm(&v1, &v2, &v);
 			}
 
@@ -187,8 +133,9 @@ int main(int argc, char** argv) {
 			
 			for (unsigned long long int i = 0 ; i < N ; i++) {
 				__asm__ __volatile__("");
-				v = add_sse(v1, v2);
+				//v = add_sse(v1, v2);
 				// add_vec4_sse_asm(&v1, &v2, &v);
+				add_vec4_avx_asm(&v1, &v2, &v);
 			}
 
 			end = std::chrono::steady_clock::now();
@@ -200,11 +147,11 @@ int main(int argc, char** argv) {
 		if (modes.avx) {
 			begin = std::chrono::steady_clock::now();
 			
-			for (unsigned long long int i = 0 ; i < N/4 ; i++) {
+			for (unsigned long long int i = 0 ; i < N ; i++) {
 				__asm__ __volatile__("");
-				v = add_avx(v1, v2);
+				//v = add_avx(v1, v2);
 				// add_vec4_avx_asm(&v1, &v2, &v);
-				/*vec4* Z_ptr = &v;
+				vec4* Z_ptr = &v;
 				asm volatile (
 					"vmovupd (%[X]), %%ymm1;\n\t"
 					"vaddpd (%[Y]), %%ymm1, %%ymm0;\n\t"
@@ -212,7 +159,7 @@ int main(int argc, char** argv) {
 					: [Z] "+r" (Z_ptr)
 					: [X] "r" (&v1), [Y] "r" (&v2)
 					: "ymm0", "ymm1"
-				);*/
+				);
 			}
 
 			end = std::chrono::steady_clock::now();
@@ -229,6 +176,108 @@ int main(int argc, char** argv) {
 }
 
 
+
+
+int arguments(int argc, char** argv, Modes& modes, Functions& functions, unsigned long long int* N) {
+	if (argc > 1) {
+		std::stringstream ss;
+		std::string arg;
+		bool error = false;
+		
+		for (int i = 1 ; i < argc ; i++) {
+			ss.clear();
+			ss.str(argv[i]);
+			arg = ss.str();
+			
+			if (arg == "--help" || arg == "-h") {
+				std::cout << "Usage : " << argv[0] << " [options]" << "\n";
+				std::cout << "Options :" << "\n";
+				std::cout << "  -h, --help                      Print help message" << "\n";
+				std::cout << "  -f, --function FUNCTION         Specify kind of functions to evaluate, use with 'list' to list all available functions" << "\n";
+				std::cout << "  -m, --mode MODE                 Specify type of implementation to evaluate, use with 'list' to list all available modes" << "\n";
+				std::cout << "  -n, -N                          Number of iteration in the evaluation loop" << "\n";
+				std::cout << "  -o, --operation OPERATION       Specify operations to evaluate, use with 'list' to list all available operations" << "\n";
+				std::cout << "  -v1, -v2 VECTOR                 Specify components of vector v1 or v2" << "\n";                       
+				
+				return 1;
+			} else if (arg == "-n" || arg == "-N") {
+				if (++i < argc) {
+					ss.clear();
+					ss.str(argv[i]);
+					ss >> (*N);
+					
+					if (ss.fail()) {
+						error = true;
+						
+						std::cerr << "Error : \"" << argv[i] << "\" is not a valid number" << std::endl;
+					}
+				} else {
+					error = true;
+					
+					std::cerr << "Error : number of operations is not specified" << std::endl;
+				}
+			} else if (arg == "--mode" || arg == "-m") {
+				if (++i < argc) {
+					ss.clear();
+					ss.str(argv[i]);
+					std::string mode = ss.str();
+					std::replace(mode.begin(), mode.end(), ',', ' ');
+					ss.clear();
+					ss.str(mode);
+					
+					modes.compiler = false;
+					modes.serial = false;
+					modes.sse = false;
+					modes.avx = false;
+					
+					while (ss >> mode) {
+						if (mode == "list") {
+							std::cout << "Available modes : compiler [comp], fpu, serial, sse, avx" << std::endl;
+							
+							return 1;
+						} else if (mode == "compiler" || mode == "comp") {
+							modes.compiler = true;
+						} else if (mode == "serial") {
+							modes.serial = true;
+						} else if (mode == "sse") {
+							modes.sse = true;
+						} else if (mode == "avx") {
+							modes.avx = true;
+						} else if (mode == "all") {
+							modes.compiler = true;
+							modes.serial = true;
+							modes.sse = true;
+							modes.avx = true;
+						} else {
+							error = true;
+							std::cerr << "Unknown mode \"" << mode << std::endl;
+						}
+					}
+					
+				} else {
+					error = true;
+					
+					std::cerr << "Error : mode is not specified" << std::endl;
+				}
+			} else if (arg == "--function" || arg == "-f") {
+				
+			} else if (arg == "--operation" || arg == "-o") {
+			} else if (arg == "-v1" || arg == "--v1") {
+			} else if (arg == "-v2" || arg == "--v2") {
+			} else {
+				error = true;
+				
+				std::cerr << "Error : parameter \"" << arg << "\" is not valid" << std::endl;
+			}
+		}
+		
+		if (error) {
+			return -1;
+		}
+	}
+	
+	return 0;
+}
 
 
 
