@@ -12,7 +12,7 @@ vec4 add_compiler(const vec4& X, const vec4& Y) {
  * Use the 128 bits SIMD registers xmm but not the vectorized operation
  */
 vec4 add_serial(const vec4& X, const vec4& Y) {
-	vec4 Z(0.0, 0.0, 0.0, 0.0);
+	vec4 Z;
 
 	vec4* Z_ptr = &Z;
 	
@@ -50,7 +50,7 @@ vec4 add_serial(const vec4& X, const vec4& Y) {
  * Use 128 bits xmm registers and vectorized operation
  */
 vec4 add_sse(const vec4& X, const vec4& Y) {
-	vec4 Z(0.0, 0.0, 0.0, 0.0);
+	vec4 Z;
 
 	vec4* Z_ptr = &Z;
 
@@ -78,7 +78,7 @@ vec4 add_sse(const vec4& X, const vec4& Y) {
  * Use the 256 bits registers ymm with vectorized operation
  */
 vec4 add_avx(const vec4& X, const vec4& Y) {
-	vec4 Z(0.0, 0.0, 0.0, 0.0);
+	vec4 Z;
 
 	vec4* Z_ptr = &Z;
 	
