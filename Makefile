@@ -33,13 +33,16 @@ init_asm:
 	mkdir -p asm
 
 # Projects
-exe: bin/executable
+exe: bin/executable bin/testvec4
 asm: init_asm asm/executable
 
 
 # Binaries
 bin/executable: obj/main.o $(VEC4OBJ)
 	$(CXX) $^ -o bin/executable $(LDFLAGS)
+
+bin/testvec4: obj/testvec4.o obj/vec4.o
+	$(CXX) $^ -o bin/vec4 $(LDFLAGS)
 
 asm/executable: asm/main.a $(VEC4ASM)
 
